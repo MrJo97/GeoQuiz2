@@ -2,6 +2,7 @@ package com.example.geoquiz2;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -17,7 +18,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_INDEX = "index";
     //used to set filters for LogCat
     private static final String TAG = "MainActivity";
+    //request code
+    private static final int REQUEST_CODE_CHEAT = 0;
 
+    private boolean mIsCheater;
     private Button mCheatButton; //change to CheatActivity
     private Button mTrueButton;
     private Button mFalseButton;
@@ -42,13 +46,16 @@ public class MainActivity extends AppCompatActivity {
     private void checkAnswer(boolean userPressedTrue) {
         boolean answerIsTrue = mQuestionBank[mCurrentIndex].isAnswerTrue();
         int messageResId = 0;
-        if (userPressedTrue == answerIsTrue) {
-            messageResId = R.string.correct_toast;
+        if (mIsCheater) {
+            messageResId = R.string.judgment_toast;
         } else {
-            messageResId = R.string.incorrect_toast;
+            if (userPressedTrue == answerIsTrue) {
+                messageResId = R.string.correct_toast;
+            } else {
+                messageResId = R.string.incorrect_toast;
+            }
         }
-        Toast.makeText(this, messageResId, Toast.LENGTH_SHORT)
-                .show();
+        Toast.makeText(this, messageResId, Toast.LENGTH_SHORT).show();
     }
 
     //main
@@ -57,6 +64,12 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate(Bundle) called");
         setContentView(R.layout.activity_main);
+
+        //retrieve the counter saved in the Bundle object
+        if (savedInstanceState != null) {
+            mCurrentIndex = savedInstanceState.getInt(KEY_INDEX, 0);
+        }
+        updateQuestion();
 
         mQuestionTextView = (TextView) findViewById(R.id.question_text_view);
         mTrueButton = (Button) findViewById(R.id.true_button);
@@ -88,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 mCurrentIndex = (mCurrentIndex + 1) % mQuestionBank.length;
+                mIsCheater = false;
                 updateQuestion();
             }
         });
@@ -108,19 +122,40 @@ public class MainActivity extends AppCompatActivity {
         mCheatButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent i = new Intent(MainActivity.this, CheatActivity.class);
-                startActivity(i);
+                //Intent i = new Intent(MainActivity.this, CheatActivity.class);
+                boolean answerIsTrue = 	mQuestionBank[mCurrentIndex].isAnswerTrue();
+                Intent i = CheatActivity.newIntent(MainActivity.this, answerIsTrue);
+                //startActivity(i);
+                //start the child activity and espect a result
+                startActivityForResult(i, REQUEST_CODE_CHEAT);
+                //NB: come detto nell'audio della lez. 2, questo REQUEST_CODE_CHEAT non è altro che
+                //un codice che rappresenta la sotto-attività (CheatActivity in questo caso)
             }
         });
-
-        //retrieve the counter saved in the Bindle object
-        if (savedInstanceState != null) {
-            mCurrentIndex = savedInstanceState.getInt(KEY_INDEX, 0);
-        }
-        updateQuestion();
     }
 
+    //onActivityResult viene invocato dal SO non appena
+    // ritorno alla MainActivity (premendo il pulsante di back ad esempio)
+    //Però in questo caso CheatActivity deve aver settato una "risposta", ossia aver
+    //inviato indietro dei dati (in questo caso rappresentati dall'argomento "data" del metodo
+    // qui sotto)
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        Log.i(TAG, "onActivityResult() called");
+        if (resultCode != Activity.RESULT_OK) {
+            return;
+        }
+       // Log.i(TAG, String.valueOf((requestCode == REQUEST_CODE_CHEAT)));  è true
+        if (requestCode == REQUEST_CODE_CHEAT) {
+            if (data == null) {
+                return;
+            }
 
+            mIsCheater = CheatActivity.wasAnswerShown(data);
+           // Log.i(TAG, String.valueOf(mIsCheater));  mIsCheater è true
+        }
+    }
 
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
